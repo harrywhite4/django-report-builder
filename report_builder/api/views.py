@@ -54,7 +54,8 @@ class FilterFieldViewSet(ReportBuilderViewMixin, viewsets.ModelViewSet):
 
 
 class ContentTypeViewSet(ReportBuilderViewMixin, viewsets.ReadOnlyModelViewSet):
-    """ Read only view of content types.
+    """
+    Read only view of content types.
     Used to populate choices for new report root model.
     """
     serializer_class = ContentTypeSerializer
@@ -138,16 +139,18 @@ class RelatedFieldsView(ReportBuilderViewMixin, GetFieldsMixin, APIView):
             verbose_name = getattr(new_field, 'verbose_name', None)
             if verbose_name is None:
                 verbose_name = new_field.get_accessor_name()
-            result += [{
-                'field_name': new_field.field_name,
-                'verbose_name': verbose_name,
-                'path': path,
-                'help_text': getattr(new_field, 'help_text', ''),
-                'model_id': model_ct.id,
-                'parent_model_name': model_name,
-                'parent_model_app_label': app_label,
-                'included_model': included_model,
-            }]
+
+            if included_model:
+                result += [{
+                    'field_name': new_field.field_name,
+                    'verbose_name': verbose_name,
+                    'path': path,
+                    'help_text': getattr(new_field, 'help_text', ''),
+                    'model_id': model_ct.id,
+                    'parent_model_name': model_name,
+                    'parent_model_app_label': app_label,
+                    'included_model': included_model,
+                }]
         return Response(result)
 
 
