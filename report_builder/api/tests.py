@@ -2,6 +2,8 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
+from report_builder import models
+from report_builder_demo.demo_models import models as demo_models
 from rest_framework.test import APIClient
 import json
 
@@ -54,9 +56,7 @@ class ApiTestCase(TestCase):
     @override_settings(REPORT_BUILDER_EXCLUDE=['demo_models.person'])
     def test_related_fields_exclude(self):
         related_fields = self.get_related_fields_for_ct('demo_models', 'child')
-        self.assertEqual(len(related_fields), 1)
-        self.assertEqual(related_fields[0]['field_name'], 'parent')
-        self.assertFalse(related_fields[0]['included_model'])
+        self.assertEqual(len(related_fields), 0)
 
     def test_get_all_content_types(self):
         num_content_types = ContentType.objects.count()
@@ -68,3 +68,34 @@ class ApiTestCase(TestCase):
         num_content_types = ContentType.objects.count()
         response = self.get_json('/report_builder/api/contenttypes/')
         self.assertEqual(len(response), num_content_types - 1)
+
+    def test_generate_report(self):
+        demo_models.FooExclude.objects.create(
+            char_field='Visible',
+            char_field2='Invisible'
+        )
+        report = models.Report.objects.create(
+            name='MyReport',
+            slug='myreport',
+            root_model=ContentType.objects.get_for_model(demo_models.FooExclude),
+        )
+
+        models.DisplayField.objects.create(
+            name='Char Field',
+            report=report,
+            field='char_field',
+            field_verbose='char_field',
+        )
+        models.DisplayField.objects.create(
+            name='Char Field2',
+            report=report,
+            field='char_field2',
+            field_verbose='char_field2',
+        )
+
+        self.client.login(username='su', password='su')
+        response = self.client.get(reverse('generate_report', args=[report.id]))
+        self.assertEqual(response.status_code, 200)
+        response_json = json.loads(response.conent)
+        self.assertEqual('Char Field2' not in response_json['meta']['titles'])
+        self.assertEqual('Invisible' not in response_json['data'][0])
