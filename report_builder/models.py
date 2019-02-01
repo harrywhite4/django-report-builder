@@ -147,12 +147,40 @@ class Report(models.Model):
             pass
         return "Invalid"
 
+    def is_field_allowed(self, display_field, allowed_models=[]):
+        """
+        Check whether a field is allowed to be displayed in this report
+        """
+        field_type = display_field.field_type
+        if field_type == 'Invalid':
+            return False
+
+        # Get model
+        model = get_model_from_path_string(self.root_model_class, display_field.field_key)
+        # Check the model itself is allowed
+        if allowed_models and model not in allowed_models:
+            return False
+
+        # Check Field exclusions
+        meta = getattr(model, 'ReportBuilder', None)
+        if meta:
+            fields = getattr(meta, 'fields', None)
+            exclude = getattr(meta, 'exclude', None)
+            if fields and display_field.field not in fields:
+                return False
+            if exclude and display_field.field in exclude:
+                return False
+
+        # field = model._meta.get_field(display_field.field_name)
+        return True
+
     def get_good_display_fields(self):
         """ Returns only valid display fields """
+        allowed_models = get_allowed_models()
         display_fields = self.displayfield_set.all()
         bad_display_fields = []
         for display_field in display_fields:
-            if display_field.field_type == "Invalid":
+            if not self.is_field_allowed(display_field, allowed_models):
                 bad_display_fields.append(display_field)
         return display_fields.exclude(id__in=[o.id for o in bad_display_fields])
 
