@@ -150,6 +150,7 @@ class Report(models.Model):
     def is_field_allowed(self, display_field, allowed_models=[]):
         """
         Check whether a field is allowed to be displayed in this report
+        allowed models is a list of content types (as get_allowed_models returns)
         """
         field_type = display_field.field_type
         if field_type == 'Invalid':
@@ -158,8 +159,10 @@ class Report(models.Model):
         # Get model
         model = get_model_from_path_string(self.root_model_class, display_field.field_key)
         # Check the model itself is allowed
-        if allowed_models and model not in allowed_models:
-            return False
+        if allowed_models:
+            ct = ContentType.objects.get_for_model(model)
+            if ct not in allowed_models:
+                return False
 
         # Check Field exclusions
         meta = getattr(model, 'ReportBuilder', None)
