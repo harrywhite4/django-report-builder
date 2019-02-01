@@ -141,3 +141,44 @@ class ApiTestCase(TestCase):
         response_json = json.loads(response.content)
         self.assertTrue('Char Field2' not in response_json['meta']['titles'])
         self.assertTrue('Invisible' not in response_json['data'][0])
+
+    @override_settings(REPORT_BUILDER_EXCLUDE=['demo_models.person'])
+    def test_generate_report_excluded_model(self):
+        person = demo_models.Person.objects.create(
+            first_name='Jeff',
+            last_name='Jefferson',
+        )
+        demo_models.Child.objects.create(
+            parent=person,
+            first_name='Steve',
+            last_name='Stevenson',
+        )
+
+        report = models.Report.objects.create(
+            name='MyReport',
+            slug='myreport',
+            root_model=ContentType.objects.get_for_model(demo_models.Child),
+        )
+        models.DisplayField.objects.create(
+            name='First Name',
+            report=report,
+            field='first_name',
+            field_verbose='first_name',
+        )
+        pfn = models.DisplayField.objects.create(
+            name='Parent First Name',
+            report=report,
+            field='first_name',
+            field_verbose='first_name',
+            path='parent__'
+        )
+        self.assertNotEqual(pfn.field_type, 'Invalid')  # Make sure the field works
+
+        # Generate the report
+        self.client.login(username='su', password='su')
+        response = self.client.get(reverse('generate_report', args=[report.id]))
+        self.assertEqual(response.status_code, 200)
+        response_json = json.loads(response.content)
+        # Check results
+        self.assertTrue('Parent First Name' not in response_json['meta']['titles'])
+        self.assertTrue('Jeff' not in response_json['data'][0])
