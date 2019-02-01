@@ -70,6 +70,48 @@ class ApiTestCase(TestCase):
         self.assertEqual(len(response), num_content_types - 1)
 
     def test_generate_report(self):
+        """Test generating a simple report on Account model"""
+        demo_models.Account.objects.create(
+            name='My Account',
+            balance=12.10,
+            budget=100.00
+        )
+        report = models.Report.objects.create(
+            name='MyReport',
+            slug='myreport',
+            root_model=ContentType.objects.get_for_model(demo_models.Account),
+        )
+        models.DisplayField.objects.create(
+            name='Name',
+            report=report,
+            field='name',
+            field_verbose='name',
+        )
+        models.DisplayField.objects.create(
+            name='Balance',
+            report=report,
+            field='balance',
+            field_verbose='balance',
+        )
+        models.DisplayField.objects.create(
+            name='Budget',
+            report=report,
+            field='budget',
+            field_verbose='budget',
+        )
+
+        self.client.login(username='su', password='su')
+        response = self.client.get(reverse('generate_report', args=[report.id]))
+        self.assertEqual(response.status_code, 200)
+        response_json = json.loads(response.content)
+        self.assertCountEqual(response_json['data'], [['My Account', 12.1, 100.0]])
+        self.assertCountEqual(response_json['meta']['titles'], ['Name', 'Balance', 'Budget'])
+
+    def test_generate_report_excluded_fields(self):
+        """
+        Test that a report does not include excluded fields
+        Even when the display fields are present
+        """
         demo_models.FooExclude.objects.create(
             char_field='Visible',
             char_field2='Invisible'
